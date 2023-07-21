@@ -12,6 +12,7 @@ use crate::tc3_hmac;
 
 const GST_OFFSET: UtcOffset = offset!(+8);
 
+/// tencentcloud api client
 #[derive(Debug, Clone)]
 pub struct Client {
     region: String,
@@ -20,6 +21,7 @@ pub struct Client {
 }
 
 impl Client {
+    /// create a api client
     pub fn new(region: String, auth: Auth) -> Self {
         Self {
             region,
@@ -28,6 +30,7 @@ impl Client {
         }
     }
 
+    /// send api request, get the api response and request id
     #[instrument(level = "trace", err)]
     pub async fn send<A: Api>(&self, request: &A::Request) -> Result<(A::Response, String), Error> {
         let payload = serde_json::to_vec(request)?;
@@ -88,6 +91,7 @@ impl Client {
     }
 }
 
+/// tencentcloud api auth
 #[derive(Clone)]
 pub struct Auth {
     secret_key: String,
@@ -95,6 +99,7 @@ pub struct Auth {
 }
 
 impl Auth {
+    /// create tencentcloud api auth by `secret_key` and `access_id`
     pub fn new(secret_key: String, access_id: String) -> Self {
         Self {
             secret_key,
