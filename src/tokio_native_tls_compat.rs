@@ -69,7 +69,17 @@ impl tokio::io::AsyncWrite for MaybeTls {
 
 impl Connection for MaybeTls {
     fn connected(&self) -> Connected {
-        Connected::new()
+        match self {
+            MaybeTls::Tcp(s) => s.connected(),
+            MaybeTls::Tls(s) => {
+                let tls = s.get_ref();
+                let connected = tls.get_ref().get_ref().connected();
+                match tls.negotiated_alpn() {
+                    Ok(Some(alpn)) if alpn == b"h2" => connected.negotiated_h2(),
+                    _ => connected,
+                }
+            }
+        }
     }
 }
 
@@ -80,8 +90,11 @@ pub struct Connector {
 
 impl Default for Connector {
     fn default() -> Self {
-        let tls_connector = tokio_native_tls::native_tls::TlsConnector::new()
-            .expect("build native_tls tls connector failed");
+        let mut builder = native_tls::TlsConnector::builder();
+        let tls_connector = builder
+            .request_alpns(&["h2", "http/1.1"])
+            .build()
+            .unwrap_or_else(|err| panic!("build tls connector failed: {err}"));
 
         Self {
             tls_connector: tls_connector.into(),
