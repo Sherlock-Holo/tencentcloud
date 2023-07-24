@@ -11,7 +11,7 @@ pub enum Error {
 
     /// http error
     #[error(transparent)]
-    Http(#[from] reqwest::Error),
+    Http(#[from] hyper::Error),
 
     /// other error
     #[error(transparent)]

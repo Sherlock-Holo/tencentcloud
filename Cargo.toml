@@ -1,6 +1,6 @@
 [package]
 name = "tencentcloud"
-version = "0.1.1"
+version = "0.2.0-alpha1"
 edition = "2021"
 authors = ["Sherlock Holo <sherlockya@gmail.com>"]
 license = "MIT"
@@ -10,17 +10,34 @@ description = "tencentcloud rust generic sdk"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["rustls-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
-native-tls = ["reqwest/native-tls"]
+default = ["tokio-rustls-tls"]
+
+tokio-rustls-tls = ["dep:hyper-rustls"]
+tokio-native-tls = ["dep:tokio-native-tls", "tokio/net"]
+
+async-std-native-tls = ["dep:tokio-util", "dep:tokio", "dep:async-std", "dep:async-native-tls"]
+async-std-rustls-tls = ["dep:tokio-util", "dep:tokio", "dep:async-std", "dep:async-tls"]
 
 [dependencies]
 hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 time = { version = "0.3", features = ["formatting", "macros"] }
-reqwest = { version = "0.11", features = ["json", "socks"], default-features = false }
+hyper = { version = "0.14", features = ["client", "http1", "http2"] }
+http-body = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 tracing = "0.1"
+futures-util = "0.3"
+
+# async-std rustls or native-tls
+async-std = { version = "1", optional = true }
+async-tls = { version = "0.12", default-features = false, features = ["client"], optional = true }
+async-native-tls = { version = "0.5", optional = true }
+tokio = { version = "1", optional = true }
+tokio-util = { version = "0.7", features = ["compat"], optional = true }
+
+# tokio rustls or native-tls
+hyper-rustls = { version = "0.24", default-features = false, features = ["http1", "http2", "native-tokio"], optional = true }
+tokio-native-tls = { version = "0.3", optional = true }

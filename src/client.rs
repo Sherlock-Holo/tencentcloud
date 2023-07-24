@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter};
 
-use reqwest::Request;
+use http_body::Limited;
+use hyper::{body, Body, Method, Request, StatusCode};
 use serde::Deserialize;
 use time::macros::offset;
 use time::{OffsetDateTime, UtcOffset};
@@ -8,6 +9,7 @@ use tracing::{instrument, trace};
 
 use crate::api::Api;
 use crate::error::{ApiError, Error};
+use crate::http_client::{new_http_client, HttpClient};
 use crate::tc3_hmac;
 
 const GST_OFFSET: UtcOffset = offset!(+8);
@@ -16,17 +18,19 @@ const GST_OFFSET: UtcOffset = offset!(+8);
 #[derive(Debug, Clone)]
 pub struct Client {
     region: String,
-    http_client: reqwest::Client,
+    http_client: HttpClient,
     auth: Auth,
+    response_size_limit: Option<usize>,
 }
 
 impl Client {
     /// create a api client
-    pub fn new(region: String, auth: Auth) -> Self {
+    pub fn new(region: String, auth: Auth, response_size_limit: impl Into<Option<usize>>) -> Self {
         Self {
             region,
-            http_client: Default::default(),
+            http_client: new_http_client(),
             auth,
+            response_size_limit: response_size_limit.into(),
         }
     }
 
@@ -41,11 +45,28 @@ impl Client {
 
         trace!(?request, "create http request done");
 
-        let response = self.http_client.execute(request).await?;
+        let response = self.http_client.request(request).await?;
 
         trace!(?response, "get http response done");
 
-        let response = response.json::<Response<A::Response>>().await?;
+        if response.status() != StatusCode::OK {
+            return Err(Error::Other(
+                format!("status code is not OK: {}", response.status()).into(),
+            ));
+        }
+
+        let body = response.into_body();
+        let body = match self.response_size_limit {
+            None => body::to_bytes(body).await?,
+
+            Some(limit) => body::to_bytes(Limited::new(body, limit))
+                .await
+                .map_err(|err| Error::Other(err))?,
+        };
+
+        trace!("read http body done");
+
+        let response = serde_json::from_slice::<Response<A::Response>>(&body)?;
 
         trace!(?response, "unmarshal response done");
 
@@ -63,7 +84,7 @@ impl Client {
     }
 
     #[instrument(level = "trace", err)]
-    fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request, Error> {
+    fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request<Body>, Error> {
         let now = OffsetDateTime::now_utc().to_offset(GST_OFFSET);
         let authorization = tc3_hmac::calculate_authorization(
             &self.auth.access_id,
@@ -75,17 +96,17 @@ impl Client {
         )
         .map_err(Error::Other)?;
 
-        let request = self
-            .http_client
-            .post(format!("https://{}", A::HOST))
+        let request = Request::builder()
+            .uri("https://tmt.tencentcloudapi.com")
+            .method(Method::POST)
             .header("Authorization", authorization)
             .header("Content-Type", "application/json; charset=utf-8")
             .header("X-TC-Action", A::ACTION)
-            .header("X-TC-Timestamp", now.unix_timestamp().to_string())
+            .header("X-TC-Timestamp", now.unix_timestamp())
             .header("X-TC-Version", A::VERSION)
             .header("X-TC-Region", &self.region)
-            .body(payload)
-            .build()?;
+            .body(Body::from(payload))
+            .map_err(|err| Error::Other(err.into()))?;
 
         Ok(request)
     }
