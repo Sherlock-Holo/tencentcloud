@@ -1,3 +1,5 @@
+//! tencentcloud api client
+
 use std::fmt::{Debug, Formatter};
 
 use http_body::Limited;
@@ -15,6 +17,8 @@ use crate::tc3_hmac;
 const GST_OFFSET: UtcOffset = offset!(+8);
 
 /// tencentcloud api client
+///
+/// the [`Client`] can be used to send request to tencentcloud and get the response
 #[derive(Debug, Clone)]
 pub struct Client {
     region: String,
@@ -24,7 +28,10 @@ pub struct Client {
 }
 
 impl Client {
-    /// create a api client
+    /// create an api client
+    ///
+    /// `response_size_limit` is used to limit the http response size, if `response_size_limit` is
+    /// set and response body size is bigger then `response_size_limit`, will return error
     pub fn new(region: String, auth: Auth, response_size_limit: impl Into<Option<usize>>) -> Self {
         Self {
             region,
@@ -35,6 +42,8 @@ impl Client {
     }
 
     /// send api request, get the api response and request id
+    ///
+    /// the `request` and `response` types are defined by the `A`: [`Api`]
     #[instrument(level = "trace", err)]
     pub async fn send<A: Api>(&self, request: &A::Request) -> Result<(A::Response, String), Error> {
         let payload = serde_json::to_vec(request)?;
@@ -87,7 +96,7 @@ impl Client {
     fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request<Body>, Error> {
         let now = OffsetDateTime::now_utc().to_offset(GST_OFFSET);
         let authorization = tc3_hmac::calculate_authorization(
-            &self.auth.access_id,
+            &self.auth.secret_id,
             &self.auth.secret_key,
             A::SERVICE,
             A::HOST,
@@ -113,18 +122,22 @@ impl Client {
 }
 
 /// tencentcloud api auth
+///
+/// currently only support `secret_key` and `secret_id`
 #[derive(Clone)]
 pub struct Auth {
     secret_key: String,
-    access_id: String,
+    secret_id: String,
 }
 
 impl Auth {
-    /// create tencentcloud api auth by `secret_key` and `access_id`
-    pub fn new(secret_key: String, access_id: String) -> Self {
+    /// create tencentcloud api auth by `secret_key` and `secret_id`
+    ///
+    /// you can get the `secret_key` and `secret_id` from tencentcloud web console
+    pub fn new(secret_key: String, secret_id: String) -> Self {
         Self {
             secret_key,
-            access_id,
+            secret_id,
         }
     }
 }
@@ -132,7 +145,7 @@ impl Auth {
 impl Debug for Auth {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Auth")
-            .field("access_id", &self.access_id)
+            .field("secret_id", &self.secret_id)
             .finish_non_exhaustive()
     }
 }

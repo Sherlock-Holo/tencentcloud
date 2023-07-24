@@ -1,3 +1,7 @@
+//! tencentcloud api library
+//!
+//! this crate provides a generic [`Client`] and [`api::Api`]
+
 pub use self::client::{Auth, Client};
 pub use self::error::Error;
 

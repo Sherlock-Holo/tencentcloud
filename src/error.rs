@@ -1,8 +1,11 @@
+//! error types
+
 use std::error;
 
 use serde::Deserialize;
 use thiserror::Error;
 
+/// the error
 #[derive(Debug, Error)]
 pub enum Error {
     /// tencentcloud api error
@@ -23,6 +26,8 @@ pub enum Error {
 }
 
 /// tencentcloud api error
+///
+/// the code and message are returned by tencentcloud api server
 #[derive(Debug, Deserialize, Error)]
 #[error("code: {code}, message: {message}")]
 #[non_exhaustive]
