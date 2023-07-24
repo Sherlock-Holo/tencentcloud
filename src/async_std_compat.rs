@@ -255,7 +255,9 @@ mod native_tls_compat {
     }
 
     #[derive(Default, Clone)]
-    pub struct Connector;
+    pub struct Connector {
+        _priv: (),
+    }
 
     impl Service<Uri> for Connector {
         type Response = MaybeTls;

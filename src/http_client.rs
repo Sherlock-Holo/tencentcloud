@@ -47,7 +47,7 @@ pub type HttpClient = hyper::Client<Connector, Body>;
 pub fn new_http_client() -> HttpClient {
     hyper::Client::builder()
         .executor(HyperExecutor)
-        .build(Connector)
+        .build(Connector::default())
 }
 
 #[cfg(all(
