@@ -5,16 +5,13 @@ use std::fmt::{Debug, Formatter};
 use http_body::Limited;
 use hyper::{body, Body, Method, Request, StatusCode};
 use serde::Deserialize;
-use time::macros::offset;
-use time::{OffsetDateTime, UtcOffset};
+use time::OffsetDateTime;
 use tracing::{instrument, trace};
 
 use crate::api::Api;
 use crate::error::{ApiError, Error};
 use crate::http_client::{new_http_client, HttpClient};
 use crate::tc3_hmac;
-
-const GST_OFFSET: UtcOffset = offset!(+8);
 
 /// tencentcloud api client
 ///
@@ -94,7 +91,7 @@ impl Client {
 
     #[instrument(level = "trace", err)]
     fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request<Body>, Error> {
-        let now = OffsetDateTime::now_utc().to_offset(GST_OFFSET);
+        let now = OffsetDateTime::now_utc();
         let authorization = tc3_hmac::calculate_authorization(
             &self.auth.secret_id,
             &self.auth.secret_key,
