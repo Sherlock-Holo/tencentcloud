@@ -1,66 +1,66 @@
 #[cfg(all(
-    feature = "tokio-rustls-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    any(feature = "async-net-rustls-tls", feature = "async-net-native-tls"),
+    not(feature = "tokio-rustls-tls"),
+    not(feature = "tokio-native-tls")
 ))]
-use hyper::client::HttpConnector;
-#[cfg(any(
-    feature = "tokio-rustls-tls",
-    feature = "tokio-native-tls",
-    feature = "async-std-rustls-tls",
-    feature = "async-std-native-tls"
-))]
-use hyper::Body;
+use crate::async_net_compat::{Connector, HyperExecutor};
+use bytes::Bytes;
+use http_body_util::Full;
 #[cfg(all(
     feature = "tokio-rustls-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
 use hyper_rustls::HttpsConnector;
-
 #[cfg(all(
-    any(feature = "async-std-rustls-tls", feature = "async-std-native-tls"),
-    not(feature = "tokio-rustls-tls"),
-    not(feature = "tokio-native-tls")
+    feature = "tokio-rustls-tls",
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
-use crate::async_std_compat::{Connector, HyperExecutor};
+use hyper_util::client::legacy::connect::HttpConnector;
+#[cfg(all(
+    any(feature = "tokio-rustls-tls", feature = "tokio-native-tls"),
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
+))]
+use hyper_util::rt::TokioExecutor;
 
 #[cfg(all(
     feature = "tokio-rustls-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
-pub type HttpClient = hyper::Client<HttpsConnector<HttpConnector>, Body>;
+pub type HttpClient =
+    hyper_util::client::legacy::Client<HttpsConnector<HttpConnector>, Full<Bytes>>;
 
 #[cfg(all(
-    any(feature = "async-std-rustls-tls", feature = "async-std-native-tls"),
+    any(feature = "async-net-rustls-tls", feature = "async-net-native-tls"),
     not(feature = "tokio-rustls-tls"),
     not(feature = "tokio-native-tls")
 ))]
-pub type HttpClient = hyper::Client<Connector, Body>;
+pub type HttpClient = hyper_util::client::legacy::Client<Connector, Full<Bytes>>;
 
 #[cfg(all(
-    any(feature = "async-std-rustls-tls", feature = "async-std-native-tls"),
+    any(feature = "async-net-rustls-tls", feature = "async-net-native-tls"),
     not(feature = "tokio-rustls-tls"),
     not(feature = "tokio-native-tls")
 ))]
 pub fn new_http_client() -> HttpClient {
-    hyper::Client::builder()
-        .executor(HyperExecutor)
-        .build(Connector::default())
+    hyper_util::client::legacy::Client::builder(HyperExecutor).build(Connector::default())
 }
 
 #[cfg(all(
     feature = "tokio-rustls-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
 pub fn new_http_client() -> HttpClient {
     use hyper_rustls::HttpsConnectorBuilder;
 
-    hyper::Client::builder().build(
+    hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(
         HttpsConnectorBuilder::new()
             .with_native_roots()
+            .expect("no native root CA certificates found")
             .https_or_http()
             .enable_http1()
             .enable_http2()
@@ -70,18 +70,19 @@ pub fn new_http_client() -> HttpClient {
 
 #[cfg(all(
     feature = "tokio-native-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
-pub type HttpClient = hyper::Client<crate::tokio_native_tls_compat::Connector, Body>;
+pub type HttpClient =
+    hyper_util::client::legacy::Client<crate::tokio_native_tls_compat::Connector, Full<Bytes>>;
 
 #[cfg(all(
     feature = "tokio-native-tls",
-    not(feature = "async-std-rustls-tls"),
-    not(feature = "async-std-native-tls")
+    not(feature = "async-net-rustls-tls"),
+    not(feature = "async-net-native-tls")
 ))]
 pub fn new_http_client() -> HttpClient {
     use crate::tokio_native_tls_compat::Connector;
 
-    hyper::Client::builder().build(Connector::default())
+    hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(Connector::default())
 }

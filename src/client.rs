@@ -1,16 +1,16 @@
 //! tencentcloud api client
 
-use std::fmt::{Debug, Formatter};
-
-use http_body::Limited;
-use hyper::{body, Body, Method, Request, StatusCode};
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full, Limited};
+use hyper::{Method, Request, StatusCode};
 use serde::Deserialize;
+use std::fmt::{Debug, Formatter};
 use time::OffsetDateTime;
 use tracing::{instrument, trace};
 
 use crate::api::Api;
 use crate::error::{ApiError, Error};
-use crate::http_client::{new_http_client, HttpClient};
+use crate::http_client::{HttpClient, new_http_client};
 use crate::tc3_hmac;
 
 /// tencentcloud api client
@@ -63,12 +63,14 @@ impl Client {
 
         let body = response.into_body();
         let body = match self.response_size_limit {
-            None => body::to_bytes(body).await?,
+            None => body.collect().await?,
 
-            Some(limit) => body::to_bytes(Limited::new(body, limit))
+            Some(limit) => Limited::new(body, limit)
+                .collect()
                 .await
-                .map_err(|err| Error::Other(err))?,
-        };
+                .map_err(Error::Other)?,
+        }
+        .to_bytes();
 
         trace!("read http body done");
 
@@ -90,7 +92,7 @@ impl Client {
     }
 
     #[instrument(level = "trace", err)]
-    fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request<Body>, Error> {
+    fn create_request<A: Api>(&self, payload: Vec<u8>) -> Result<Request<Full<Bytes>>, Error> {
         let now = OffsetDateTime::now_utc();
         let authorization = tc3_hmac::calculate_authorization(
             &self.auth.secret_id,
@@ -103,7 +105,7 @@ impl Client {
         .map_err(Error::Other)?;
 
         let request = Request::builder()
-            .uri("https://tmt.tencentcloudapi.com")
+            .uri(format!("https://{}", A::HOST))
             .method(Method::POST)
             .header("Authorization", authorization)
             .header("Content-Type", "application/json; charset=utf-8")
@@ -111,7 +113,7 @@ impl Client {
             .header("X-TC-Timestamp", now.unix_timestamp())
             .header("X-TC-Version", A::VERSION)
             .header("X-TC-Region", &self.region)
-            .body(Body::from(payload))
+            .body(Full::new(Bytes::from(payload)))
             .map_err(|err| Error::Other(err.into()))?;
 
         Ok(request)

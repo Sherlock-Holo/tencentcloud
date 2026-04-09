@@ -1,17 +1,17 @@
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 use std::io;
-use std::io::ErrorKind;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use futures_util::future::{BoxFuture, Either};
 use futures_util::{FutureExt, TryFutureExt};
-use hyper::client::connect::{Connected, Connection};
-use hyper::service::Service;
 use hyper::Uri;
-use tokio::io::ReadBuf;
+use hyper::rt::{Read, ReadBufCursor, Write};
+use hyper_util::client::legacy::connect::{Connected, Connection};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 use tokio_native_tls::{TlsConnector, TlsStream};
+use tower_service::Service;
 
 #[derive(Debug)]
 pub enum MaybeTls {
@@ -19,22 +19,43 @@ pub enum MaybeTls {
     Tls(TlsStream<TcpStream>),
 }
 
-impl tokio::io::AsyncRead for MaybeTls {
+impl Read for MaybeTls {
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
+        mut buf: ReadBufCursor<'_>,
     ) -> Poll<io::Result<()>> {
         let this = self.get_mut();
         match this {
-            MaybeTls::Tcp(tcp) => Pin::new(tcp).poll_read(cx, buf),
-            MaybeTls::Tls(tls) => Pin::new(tls).poll_read(cx, buf),
+            MaybeTls::Tcp(tcp) => {
+                let mut tokio_buf = unsafe { ReadBuf::uninit(buf.as_mut()) };
+                ready!(AsyncRead::poll_read(Pin::new(tcp), cx, &mut tokio_buf))?;
+                let n = tokio_buf.filled().len();
+
+                unsafe {
+                    buf.advance(n);
+                }
+
+                Poll::Ready(Ok(()))
+            }
+
+            MaybeTls::Tls(tls) => {
+                let mut tokio_buf = unsafe { ReadBuf::uninit(buf.as_mut()) };
+                ready!(AsyncRead::poll_read(Pin::new(tls), cx, &mut tokio_buf))?;
+                let n = tokio_buf.filled().len();
+
+                unsafe {
+                    buf.advance(n);
+                }
+
+                Poll::Ready(Ok(()))
+            }
         }
     }
 }
 
-impl tokio::io::AsyncWrite for MaybeTls {
+impl Write for MaybeTls {
     #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
@@ -117,13 +138,13 @@ impl Service<Uri> for Connector {
     fn call(&mut self, req: Uri) -> Self::Future {
         let scheme = match req.scheme_str() {
             None => {
-                return ready(Err(io::Error::new(ErrorKind::Other, "miss scheme"))).right_future();
+                return ready(Err(io::Error::other("miss scheme"))).right_future();
             }
             Some(scheme) => scheme,
         };
         let host = match req.host() {
             None => {
-                return ready(Err(io::Error::new(ErrorKind::Other, "miss host"))).right_future();
+                return ready(Err(io::Error::other("miss host"))).right_future();
             }
             Some(host) => host,
         };
@@ -152,7 +173,7 @@ impl Service<Uri> for Connector {
                     let tls_stream = tls_connector
                         .connect(&host, tcp_stream)
                         .await
-                        .map_err(|err| io::Error::new(ErrorKind::Other, err))?;
+                        .map_err(io::Error::other)?;
 
                     Ok(MaybeTls::Tls(tls_stream))
                 }
@@ -160,11 +181,9 @@ impl Service<Uri> for Connector {
                 .left_future()
             }
 
-            scheme => ready(Err(io::Error::new(
-                ErrorKind::Other,
-                format!("invalid scheme: {scheme}"),
-            )))
-            .right_future(),
+            scheme => {
+                ready(Err(io::Error::other(format!("invalid scheme: {scheme}")))).right_future()
+            }
         }
     }
 }

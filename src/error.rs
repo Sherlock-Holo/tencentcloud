@@ -7,12 +7,17 @@ use thiserror::Error;
 
 /// the error
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     /// tencentcloud api error
     #[error("error: {err}, request id: {request_id}")]
     Api { err: ApiError, request_id: String },
 
-    /// http error
+    /// http send request error
+    #[error(transparent)]
+    HttpSendRequest(#[from] hyper_util::client::legacy::Error),
+
+    /// http receive response error
     #[error(transparent)]
     Http(#[from] hyper::Error),
 

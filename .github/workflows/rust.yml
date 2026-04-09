@@ -13,7 +13,7 @@ jobs:
   build:
     strategy:
       matrix:
-        features: [ "async-std-native-tls", "async-std-rustls-tls", "tokio-native-tls", "tokio-rustls-tls" ]
+        features: [ "async-net-native-tls", "async-net-rustls-tls", "tokio-native-tls", "tokio-rustls-tls" ]
 
     runs-on: ubuntu-latest
 
