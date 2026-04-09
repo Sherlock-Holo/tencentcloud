@@ -105,7 +105,7 @@ impl Client {
         .map_err(Error::Other)?;
 
         let request = Request::builder()
-            .uri("https://tmt.tencentcloudapi.com")
+            .uri(format!("https://{}", A::HOST))
             .method(Method::POST)
             .header("Authorization", authorization)
             .header("Content-Type", "application/json; charset=utf-8")
