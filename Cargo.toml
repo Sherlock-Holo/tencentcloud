@@ -12,7 +12,7 @@ description = "tencentcloud rust generic sdk"
 [features]
 default = ["tokio-rustls-tls"]
 
-tokio-rustls-tls = ["hyper-rustls/ring", "hyper-rustls/rustls-native-certs"]
+tokio-rustls-tls = ["dep:hyper-rustls"]
 tokio-native-tls = ["dep:tokio-native-tls", "tokio/net", "dep:native-tls", "dep:tower-service"]
 
 async-net-rustls-tls = [
@@ -50,12 +50,20 @@ futures-util = "0.3.32"
 # async rustls or native-tls
 async-global-executor = { version = "3.1.0", optional = true }
 async-net = { version = "2.0.0", optional = true }
-futures-rustls = { version = "0.26.0", default-features = false, features = ["logging", "ring"], optional = true }
+futures-rustls = { version = "0.26.0", default-features = false, features = ["logging", "ring", "tls12"], optional = true }
 rustls-native-certs = { version = "0.8.3", optional = true }
 async-native-tls = { version = "0.6.0", optional = true }
 
 # tokio rustls or native-tls
-hyper-rustls = { version = "0.27.7", default-features = false, features = ["http1", "http2", "native-tokio", "ring"], optional = true }
+hyper-rustls = { version = "0.27.7", default-features = false, features = [
+    "http1",
+    "http2",
+    "native-tokio",
+    "ring",
+    "tls12",
+    "rustls-native-certs"
+], optional = true }
+
 tokio = { version = "1", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 tower-service = { version = "0.3.3", optional = true }
