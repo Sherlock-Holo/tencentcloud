@@ -32,7 +32,7 @@
 //! }
 //!
 //! impl Api for TextTranslate {
-//!     type Request = TextTranslateRequest;
+//!     type Request<'a> = TextTranslateRequest where Self: 'a;
 //!     type Response = TextTranslateResponse;
 //!     const VERSION: &'static str = "2018-03-21";
 //!     const ACTION: &'static str = "TextTranslate";
@@ -50,7 +50,9 @@ use serde::{Deserialize, Serialize};
 /// the [`Api`] define an api request type, response type and other info
 pub trait Api {
     /// the api request type
-    type Request: Serialize + Debug;
+    type Request<'a>: Serialize + Debug + 'a
+    where
+        Self: 'a;
 
     /// the api response type
     type Response: for<'a> Deserialize<'a> + Debug;

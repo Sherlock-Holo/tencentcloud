@@ -42,7 +42,10 @@ impl Client {
     ///
     /// the `request` and `response` types are defined by the `A`: [`Api`]
     #[instrument(level = "trace", err)]
-    pub async fn send<A: Api>(&self, request: &A::Request) -> Result<(A::Response, String), Error> {
+    pub async fn send<A: Api>(
+        &self,
+        request: &A::Request<'_>,
+    ) -> Result<(A::Response, String), Error> {
         let payload = serde_json::to_vec(request)?;
 
         trace!("marshal request done");
