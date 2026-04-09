@@ -1,10 +1,11 @@
+use hmac::KeyInit;
 use std::error::Error;
 
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
+use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
-use time::OffsetDateTime;
 use tracing::instrument;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -46,7 +47,9 @@ pub fn calculate_authorization(
     let signature = hmac_sha256(string_to_sign.as_bytes(), &secret_signing)?;
     let signature = hex::encode(signature);
 
-    Ok(format!("{ALGORITHM} Credential={access_id}/{credential_scope},SignedHeaders=content-type;host,Signature={signature}"))
+    Ok(format!(
+        "{ALGORITHM} Credential={access_id}/{credential_scope},SignedHeaders=content-type;host,Signature={signature}"
+    ))
 }
 
 fn hmac_sha256(
@@ -56,5 +59,5 @@ fn hmac_sha256(
     let mut hmac_sha256 = HmacSha256::new_from_slice(key)?;
     hmac_sha256.update(message);
 
-    Ok(hmac_sha256.finalize().into_bytes().try_into().unwrap())
+    Ok(hmac_sha256.finalize().into_bytes().into())
 }
